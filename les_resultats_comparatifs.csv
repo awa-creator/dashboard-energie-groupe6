@@ -1,0 +1,12 @@
+Modèle,R²,RMSE,MAE,MAPE (%),CV R² moyen
+Régression Linéaire (Baseline),0.4542,0.2971,0.181,29.24,0.2682
+Ridge (Régularisation L2),0.4607,0.2954,0.1734,27.5,0.3916
+Gradient Boosting,0.1668,0.3671,0.2533,48.73,0.2585
+Régression Linéaire (Baseline),0.4542,0.2971,0.181,29.24,0.2682
+Ridge (L2),0.4607,0.2954,0.1734,27.5,0.3916
+Random Forest,0.2869,0.3396,0.2251,40.77,0.3885
+Gradient Boosting,0.1668,0.3671,0.2533,48.73,0.2585
+Régression Linéaire (Baseline),0.4542,0.2971,0.181,29.24,0.2682
+Ridge (L2),0.4607,0.2954,0.1734,27.5,0.3916
+Random Forest,0.2869,0.3396,0.2251,40.77,0.3885
+Gradient Boosting,0.1668,0.3671,0.2533,48.73,0.2585
