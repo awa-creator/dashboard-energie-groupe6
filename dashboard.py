@@ -6,7 +6,6 @@ Lancer avec : streamlit run dashboard.py
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -15,8 +14,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.cluster import KMeans
 from fpdf import FPDF
-import io, datetime, warnings
-import shap
+import datetime, warnings
 warnings.filterwarnings("ignore")
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -332,9 +330,9 @@ def load_and_train():
     models = {
         "Regression Lineaire": LinearRegression(),
         "Ridge (L2)"         : Ridge(alpha=100),
-        "Random Forest"      : RandomForestRegressor(n_estimators=100, max_depth=12, random_state=42, n_jobs=-1),
+        "Random Forest"      : RandomForestRegressor(n_estimators=50, max_depth=8, random_state=42, n_jobs=-1),
         "Gradient Boosting"  : GradientBoostingRegressor(
-            n_estimators=300, learning_rate=0.1, max_depth=5,
+            n_estimators=80, learning_rate=0.1, max_depth=4,
             subsample=0.8, min_samples_leaf=4, random_state=42
         ),
     }
@@ -355,8 +353,8 @@ def load_and_train():
             "mape": round(np.mean(np.abs((y_test.values - pred) / (y_test.values + 1e-9))) * 100, 2),
         }
 
-    # Validation croisée temporelle — TimeSeriesSplit (5 folds)
-    tscv = TimeSeriesSplit(n_splits=5)
+    # Validation croisée temporelle — TimeSeriesSplit (3 folds)
+    tscv = TimeSeriesSplit(n_splits=3)
     cv_scores = {}
     X_all = X.values
     y_all = y.values
@@ -388,18 +386,19 @@ def load_and_train():
     df_test["Prediction"] = best["pred"]
     df_test["Residu"]     = df_test["Consommation_kWh"] - df_test["Prediction"]
 
-    # SHAP sur 400 observations du jeu de test
+    # SHAP sur 100 observations (leger pour le cloud)
+    import shap as shap_lib
     best_model = results[best_name]["model"]
     is_linear  = best_name in ("Regression Lineaire", "Ridge (L2)")
     Xte_for_shap = X_te_sc if is_linear else X_test.values
-    sample_n = min(400, len(Xte_for_shap))
+    sample_n = min(100, len(Xte_for_shap))
     rng = np.random.default_rng(42)
     idx_s = rng.choice(len(Xte_for_shap), sample_n, replace=False)
     X_shap = Xte_for_shap[idx_s]
     if is_linear:
-        explainer = shap.LinearExplainer(best_model, X_shap)
+        explainer = shap_lib.LinearExplainer(best_model, X_shap)
     else:
-        explainer = shap.TreeExplainer(best_model)
+        explainer = shap_lib.TreeExplainer(best_model)
     shap_values = explainer.shap_values(X_shap)
     shap_mean   = np.abs(shap_values).mean(axis=0)
     shap_df = pd.DataFrame({
