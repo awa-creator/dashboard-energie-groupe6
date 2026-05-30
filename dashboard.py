@@ -386,28 +386,21 @@ def load_and_train():
     df_test["Prediction"] = best["pred"]
     df_test["Residu"]     = df_test["Consommation_kWh"] - df_test["Prediction"]
 
-    # SHAP sur 100 observations (leger pour le cloud)
-    import shap as shap_lib
+    # Importance des variables (sklearn natif - pas besoin de SHAP)
     best_model = results[best_name]["model"]
-    is_linear  = best_name in ("Regression Lineaire", "Ridge (L2)")
-    Xte_for_shap = X_te_sc if is_linear else X_test.values
-    sample_n = min(100, len(Xte_for_shap))
-    rng = np.random.default_rng(42)
-    idx_s = rng.choice(len(Xte_for_shap), sample_n, replace=False)
-    X_shap = Xte_for_shap[idx_s]
-    if is_linear:
-        explainer = shap_lib.LinearExplainer(best_model, X_shap)
+    if hasattr(best_model, "feature_importances_"):
+        importances = best_model.feature_importances_
+    elif hasattr(best_model, "coef_"):
+        importances = np.abs(best_model.coef_)
     else:
-        explainer = shap_lib.TreeExplainer(best_model)
-    shap_values = explainer.shap_values(X_shap)
-    shap_mean   = np.abs(shap_values).mean(axis=0)
+        importances = np.ones(len(feature_cols))
+
     shap_df = pd.DataFrame({
         "feature":    feature_cols,
-        "importance": shap_mean,
-        "shap_vals":  [shap_values[:, i] for i in range(len(feature_cols))],
+        "importance": importances,
     }).sort_values("importance", ascending=False).reset_index(drop=True)
 
-    return df, df_test, results, best_name, feature_cols, X_test, y_test, scaler, shap_df, X_shap, cv_scores
+    return df, df_test, results, best_name, feature_cols, X_test, y_test, scaler, shap_df, cv_scores
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -421,7 +414,7 @@ _loader.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-df, df_test, results, best_name, features, X_test, y_test, _scaler, shap_df, X_shap, cv_scores = load_and_train()
+df, df_test, results, best_name, features, X_test, y_test, _scaler, shap_df, cv_scores = load_and_train()
 _loader.empty()
 
 best_r2   = results[best_name]["r2"]
@@ -1021,93 +1014,51 @@ with tab5:
                         ), showlegend=True)
     st.plotly_chart(fig_radar, use_container_width=True)
 
-    # SHAP
-    st.markdown('<span class="stitle">Interpretabilite SHAP — Impact des variables</span>', unsafe_allow_html=True)
+    # Importance des variables
+    st.markdown('<span class="stitle">Interpretabilite — Importance des variables</span>', unsafe_allow_html=True)
     st.markdown(
-        f"Analyse SHAP (SHapley Additive exPlanations) sur le modele **{best_name}**. "
-        "Chaque valeur SHAP mesure la contribution d'une variable a la prediction, "
-        "en valeur absolue moyennee sur 400 observations du jeu de test."
+        f"Importance des variables du modele **{best_name}** "
+        "(feature importances pour les modeles arborescents, |coefficient| pour les modeles lineaires)."
     )
 
     top_n = st.slider("Nombre de variables a afficher", 5, min(20, len(shap_df)), 12, key="shap_top")
     df_top = shap_df.head(top_n)
 
-    sh1, sh2 = st.columns(2)
+    colors_imp = []
+    for i in range(len(df_top)):
+        frac = i / max(len(df_top) - 1, 1)
+        if frac < 0.5:
+            colors_imp.append(VIOLET)
+        elif frac < 0.8:
+            colors_imp.append(MAGENTA)
+        else:
+            colors_imp.append(ORANGE)
 
-    with sh1:
-        colors_shap = []
-        for i in range(len(df_top)):
-            frac = i / max(len(df_top) - 1, 1)
-            if frac < 0.5:
-                colors_shap.append(VIOLET)
-            elif frac < 0.8:
-                colors_shap.append(MAGENTA)
-            else:
-                colors_shap.append(ORANGE)
-
-        fig_shap_bar = go.Figure(go.Bar(
-            x=df_top["importance"][::-1],
-            y=df_top["feature"][::-1],
-            orientation="h",
-            marker=dict(color=colors_shap[::-1], opacity=0.88, line=dict(width=0)),
-            text=df_top["importance"][::-1].round(4),
-            textposition="outside",
-        ))
-        apply_plotly_layout(fig_shap_bar,
-            title="Importance SHAP moyenne |SHAP|",
-            xaxis_title="Importance (kWh)",
-            height=max(320, top_n * 24),
-            margin=dict(l=160, r=40, t=50, b=20),
-            yaxis=dict(automargin=True, tickfont=dict(color="#000000", size=11, family="Plus Jakarta Sans")),
-        )
-        st.plotly_chart(fig_shap_bar, use_container_width=True)
-
-    with sh2:
-        fig_bee = go.Figure()
-        feat_labels = df_top["feature"].tolist()
-        for rank, (_, row) in enumerate(df_top.iterrows()):
-            sv  = row["shap_vals"]
-            jit = np.random.default_rng(rank).uniform(-0.3, 0.3, len(sv))
-            y_pos = np.full(len(sv), float(rank)) + jit * 0.4
-            fig_bee.add_trace(go.Scatter(
-                x=sv, y=y_pos,
-                mode="markers",
-                name=row["feature"],
-                marker=dict(
-                    color=sv, colorscale=[[0, "#F8F4FF"], [0.5, MAGENTA], [1, ORANGE]],
-                    size=4, opacity=0.6,
-                    showscale=(rank == 0),
-                    colorbar=dict(
-                        title=dict(text="Valeur SHAP", font=dict(color="#000000", size=11)),
-                        tickfont=dict(color="#000000", size=10),
-                        len=0.5, x=1.02,
-                    ) if rank == 0 else None,
-                ),
-                showlegend=False,
-            ))
-        fig_bee.add_vline(x=0, line_dash="dot", line_color=VIOLET, line_width=1.5)
-        apply_plotly_layout(fig_bee,
-            title="Distribution des valeurs SHAP (beeswarm)",
-            xaxis_title="Valeur SHAP (kWh)",
-            height=max(320, top_n * 24),
-            margin=dict(l=160, r=60, t=50, b=20),
-            yaxis=dict(
-                tickmode="array",
-                tickvals=list(range(len(feat_labels))),
-                ticktext=feat_labels,
-                automargin=True,
-                tickfont=dict(color="#000000", size=11, family="Plus Jakarta Sans"),
-            ),
-        )
-        st.plotly_chart(fig_bee, use_container_width=True)
+    fig_imp2 = go.Figure(go.Bar(
+        x=df_top["importance"][::-1],
+        y=df_top["feature"][::-1],
+        orientation="h",
+        marker=dict(color=colors_imp[::-1], opacity=0.88, line=dict(width=0)),
+        text=df_top["importance"][::-1].round(4),
+        textposition="outside",
+    ))
+    apply_plotly_layout(fig_imp2,
+        title=f"Top {top_n} variables les plus importantes — {best_name}",
+        xaxis_title="Importance",
+        height=max(360, top_n * 28),
+        margin=dict(l=180, r=60, t=50, b=20),
+        yaxis=dict(automargin=True, tickfont=dict(color="#000000", size=11, family="Plus Jakarta Sans")),
+    )
+    st.plotly_chart(fig_imp2, use_container_width=True)
 
     st.markdown(f"""
     <div class="kpi-card" style="padding:18px 24px;margin-top:8px;">
-      <div class="kpi-label" style="margin-bottom:8px;">Comment lire ces graphiques ?</div>
+      <div class="kpi-label" style="margin-bottom:8px;">Comment lire ce graphique ?</div>
       <div style="font-size:0.84rem;color:{TEXT_PRI};line-height:1.75;">
-        <b>Importance SHAP</b> : plus la barre est longue, plus la variable influence la prediction en moyenne.<br>
-        <b>Beeswarm</b> : chaque point est une observation. Un SHAP positif pousse la prediction a la hausse,
-        negatif a la baisse. La couleur indique la valeur de la variable (violet = faible, orange = elevee).
+        <b>Plus la barre est longue</b>, plus la variable contribue aux predictions du modele.<br>
+        Les <b>lags de consommation</b> (conso_H_1, conso_J_1) dominent : la consommation passee
+        est le meilleur predicteur de la consommation future.<br>
+        <b>Type de batiment, Surface et Occupants</b> apportent un contexte important.
       </div>
     </div>
     """, unsafe_allow_html=True)
