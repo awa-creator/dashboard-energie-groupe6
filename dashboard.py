@@ -959,7 +959,7 @@ with tab5:
     st.plotly_chart(fig_cv, use_container_width=True)
 
     st.dataframe(
-        df_cv.style.background_gradient(subset=["R² CV moyen"], cmap="Purples"),
+        df_cv,
         use_container_width=True, hide_index=True
     )
     st.markdown("<br>", unsafe_allow_html=True)
