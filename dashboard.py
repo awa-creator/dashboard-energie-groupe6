@@ -1,7 +1,5 @@
 """
 Dashboard interactif — Prediction de la Consommation Energetique
-Dataset : energydata_ready_for_machine_learning.csv (3 098 obs., horaire, Jan-Mai 2016)
-Lancer avec : streamlit run dashboard.py
 """
 import streamlit as st
 import pandas as pd
@@ -1210,7 +1208,7 @@ with tab7:
 
     r1, r2c = st.columns([1, 2])
     with r1:
-        auteur  = st.text_input("Auteur", "Groupe 6 : Jean Paul MALAN, Guy Roger Junior GNAORE, COULIBALY Fobeh, TOURE Awa")
+        auteur  = st.text_input("Auteur", "TOURE Awa")
         promo   = st.text_input("Promotion", "2025-2026 · UCAD Dakar")
     with r2c:
         st.markdown(f"""
@@ -1570,7 +1568,7 @@ with tab8:
 st.markdown(f"""
 <div class="footer">
   Dashboard — Intelligence Energetique &nbsp;|&nbsp;
-  Groupe 6 &nbsp;·&nbsp; Jean Paul MALAN · Guy Roger Junior GNAORE · COULIBALY Fobeh · TOURE Awa &nbsp;·&nbsp; Projet 2 · Data Analyst 2025 - 2026 &nbsp;|&nbsp;
+  &nbsp;·&nbsp;TOURE Awa &nbsp;·&nbsp; Projet 2 · Machine Learning 2025 - 2026 &nbsp;|&nbsp;
   {best_name} · R² = {best_r2:.4f}
 </div>
 """, unsafe_allow_html=True)
